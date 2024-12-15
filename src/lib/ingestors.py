@@ -9,6 +9,12 @@ class DataIngestor(ABC):
         Define o contrato para a ingestão de diferentes tipos de dados (estruturado, semiestruturado, não estruturado).
         Todas as classes concretas de ingestão devem implementar o método `ingest`.
     """
+
+    def __init__(self, spark, catalog, database, table_name):
+        self.spark = spark  
+        self.catalog = catalog
+        self.database = database
+        self.table_name = table_name
     
     @abstractmethod
     def ingest(self, file_path: str, external_location: str):
@@ -27,12 +33,11 @@ class StructuredDataIngestor(DataIngestor):
         Interface para ingestão de dados estruturados (ex: CSV).
     """ 
     
-    def __init__(self, spark, schema, delimiter, header):
-        self.spark = spark
+    def __init__(self, spark, catalog, database, table_name, schema, delimiter, header):
+        super().__init__(spark, catalog, database, table_name)  # Chama o construtor da classe base
         self.schema = schema
         self.delimiter = delimiter
         self.header = header
-
 
 class SemiStructuredDataIngestor(DataIngestor):
     
@@ -40,8 +45,8 @@ class SemiStructuredDataIngestor(DataIngestor):
         Interface para ingestão de dados semiestruturados (ex: JSON).
     """
     
-    def __init__(self, spark, schema, multiline=False):
-        self.spark = spark
+    def __init__(self, spark, catalog, database, table_name, schema, multiline=False):
+        super().__init__(spark, catalog, database, table_name)  # Chama o construtor da classe base
         self.schema = schema
         self.multiline = multiline
 
@@ -52,10 +57,11 @@ class UnstructuredDataIngestor(DataIngestor):
         Interface para ingestão de dados não estruturados (ex: arquivos de texto).
     """
 
-    def __init__(self, spark, schema, delimiter):
-        self.spark = spark
+    def __init__(self, spark, catalog, database, table_name, schema, delimiter):
+        super().__init__(spark, catalog, database, table_name)  # Chama o construtor da classe base
         self.schema = schema
         self.delimiter = delimiter
+
 
 # ------------------------------------------------------------------------------------------------------------- #
 
@@ -85,7 +91,7 @@ class CSVIngestor(StructuredDataIngestor):
              .save(external_location))
 
             # Chama o método auxiliar para criar a tabela externa
-            utils.create_external_table(external_location)
+            utils.create_external_table(self.spark, self.catalog, self.database, self.table_name, external_location)
             
         except Exception as e:
             print(f"Erro ao processar o arquivo CSV: {e}")
@@ -122,7 +128,7 @@ class JSONIngestor(SemiStructuredDataIngestor):
             df.write.format("delta").mode("overwrite").save(external_location)
 
             # Chama o método auxiliar para criar a tabela externa
-            utils.create_external_table(external_location)
+            utils.create_external_table(self.spark, self.catalog, self.database, self.table_name, external_location)
         
         except Exception as e:
             print(f"Erro ao processar o arquivo JSON: {e}")
@@ -161,7 +167,7 @@ class TextIngestor(UnstructuredDataIngestor):
             final_df.write.format("delta").mode("overwrite").save(external_location)
 
             # Criando a tabela externa (assumindo que utils.create_external_table já foi definido)
-            utils.create_external_table(external_location)
+            utils.create_external_table(self.spark, self.catalog, self.database, self.table_name, external_location)
 
         except Exception as e:
             print(f"Erro ao processar o arquivo de texto: {e}")
@@ -169,32 +175,31 @@ class TextIngestor(UnstructuredDataIngestor):
 # ------------------------------------------------------------------------------------------------------------- #
 
 class IngestorFactory:
-
+    
     """
-        Factory que cria a instância apropriada de um Ingestor baseado no tipo de arquivo ou dados.
+        Método para obter o Ingestor apropriado com base no tipo de arquivo.
+        
+        :param file_type: Tipo de arquivo (por exemplo, 'csv', 'json', 'text').
+        :param spark: Sessão do Spark.
+        :param catalog: Nome do catálogo de dados.
+        :param database: Nome do database.
+        :param table_name: Nome da tabela.
+        :param schema: Schema a ser aplicado durante a ingestão.
+        :param delimiter: Delimitador para arquivos como CSV ou texto.
+        :param multiline: Flag que indica se o arquivo JSON é multiline.
+        :param header: Flag para indicar se o arquivo CSV possui cabeçalho.
+        
+        :return: Instância do Ingestor apropriado.
     """
 
     @staticmethod
-    def get_ingestor(file_type: str, spark, schema, delimiter=None, multiline=False, header=True):
-        
-        """
-            Método para obter o Ingestor apropriado com base no tipo de arquivo.
-            
-            :param file_type: Tipo de arquivo (por exemplo, 'csv', 'json', 'text').
-            :param spark: Sessão do Spark.
-            :param schema: Schema a ser aplicado durante a ingestão.
-            :param delimiter: Delimitador para arquivos como CSV ou texto.
-            :param multiline: Flag que indica se o arquivo JSON é multiline.
-            :param header: Flag para indicar se o arquivo CSV possui cabeçalho.
-            
-            :return: Instância do Ingestor apropriado.
-        """
-
+    def get_ingestor(file_type: str, spark, catalog, database, table_name, schema, delimiter=None, multiline=False, header=True):
         if file_type == 'csv':
-            return CSVIngestor(spark, schema, delimiter, header)
+            return CSVIngestor(spark, catalog, database, table_name, schema, delimiter, header)
         elif file_type == 'json':
-            return JSONIngestor(spark, schema, multiline)
+            return JSONIngestor(spark, catalog, database, table_name, schema, multiline)
         elif file_type == 'text':
-            return TextIngestor(spark, schema, delimiter)
+            return TextIngestor(spark, catalog, database, table_name, schema, delimiter)
         else:
             raise ValueError(f"Tipo de arquivo desconhecido: {file_type}")
+

@@ -2,24 +2,29 @@ import json
 from pyspark.sql.types import StructType, StructField, StringType
 
 
-def create_external_table(self, external_location: str):
+def create_external_table(spark, catalog, database, table_name, external_location: str):
     
     """
         Cria uma tabela externa no Databricks apontando para o local Delta.
         
+        :param spark: Sessão Spark.
+        :param catalog: Nome do catálogo de dados.
+        :param database: Nome do banco de dados.
+        :param table_name: Nome da tabela.
         :param external_location: Caminho onde os dados são armazenados.
     """
-    self.spark.sql(f"""
-        CREATE DATABASE IF NOT EXISTS {self.catalog}.{self.database};
+
+    spark.sql(f"""
+        CREATE DATABASE IF NOT EXISTS {catalog}.{database};
     """)
     
-    self.spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {self.catalog}.{self.database}.{self.table_name}
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {catalog}.{database}.{table_name}
         USING DELTA
         LOCATION '{external_location}';
     """)
     
-    print(f"External Delta Table '{self.catalog}.{self.database}.{self.table_name}' criada com sucesso!")
+    print(f"External Delta Table '{catalog}.{database}.{table_name}' criada com sucesso!")
     
 
 # Função para carregar o schema a partir de um arquivo JSON e converter para StructType
