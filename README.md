@@ -23,6 +23,7 @@ Todas as etapas são orquestradas em um único Job no Databricks, com tasks sepa
  - Arquitetura Lakehouse
  - Python
  - Design Patterns (Factory, Strategy)
+ - SOLID
 
 
 ### Objetivos:

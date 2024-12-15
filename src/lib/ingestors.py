@@ -90,35 +90,6 @@ class CSVIngestor(StructuredDataIngestor):
         except Exception as e:
             print(f"Erro ao processar o arquivo CSV: {e}")
 
-class ParquetIngestor(StructuredDataIngestor):
-    
-    """
-        Classe concreta para ingestão de arquivos Parquet. Herda de StructuredDataIngestor.
-    """
-
-    def ingest(self, file_path: str, external_location: str):
-        
-        """
-            Ingestão de dados de arquivo Parquet para o formato Delta.
-            
-            :param file_path: Caminho do arquivo Parquet.
-            :param external_location: Caminho onde os dados serão salvos no formato Delta.
-        """
-        try:
-            (self.spark.read
-             .format("parquet")
-             .schema(self.schema)
-             .load(file_path)
-             .write
-             .format("delta")
-             .mode("overwrite")
-             .save(external_location))
-
-            # Chama o método auxiliar para criar a tabela externa
-            utils.create_external_table(external_location)
-        
-        except Exception as e:
-            print(f"Erro ao processar o arquivo Parquet: {e}")
 
 class JSONIngestor(SemiStructuredDataIngestor):
     
@@ -209,7 +180,7 @@ class IngestorFactory:
         """
             Método para obter o Ingestor apropriado com base no tipo de arquivo.
             
-            :param file_type: Tipo de arquivo (por exemplo, 'csv', 'json', 'text', 'parquet').
+            :param file_type: Tipo de arquivo (por exemplo, 'csv', 'json', 'text').
             :param spark: Sessão do Spark.
             :param schema: Schema a ser aplicado durante a ingestão.
             :param delimiter: Delimitador para arquivos como CSV ou texto.
@@ -218,11 +189,9 @@ class IngestorFactory:
             
             :return: Instância do Ingestor apropriado.
         """
-        
+
         if file_type == 'csv':
             return CSVIngestor(spark, schema, delimiter, header)
-        elif file_type == 'parquet':
-            return ParquetIngestor(spark, schema, delimiter, header)
         elif file_type == 'json':
             return JSONIngestor(spark, schema, multiline)
         elif file_type == 'text':
