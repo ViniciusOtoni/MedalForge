@@ -106,9 +106,10 @@ class JSONIngestor(SemiStructuredDataIngestor):
     """
         Classe concreta para ingestão de arquivos JSON. Herda de SemiStructuredDataIngestor.
     """
-
+    
     def ingest(self, source_directory: str, external_location: str, checkpoint_path: str, partitions: list):
-         """
+        
+        """
             Ingestão de dados de arquivo JSON para o formato Delta.
             
             :param source_directory: Diretório que será monitorado pelo AutoLoader..
@@ -146,7 +147,7 @@ class TextIngestor(UnstructuredDataIngestor):
     """
 
     def ingest(self, source_directory: str, external_location: str, checkpoint_path: str, partitions: list):
-         """
+        """
             Ingestão de dados de arquivo TEXT para o formato Delta.
             
             :param source_directory: Diretório que será monitorado pelo AutoLoader..
