@@ -25,7 +25,7 @@ def create_external_table(spark, catalog, database, table_name, external_locatio
     """)
     
     print(f"External Delta Table '{catalog}.{database}.{table_name}' criada com sucesso!")
-    
+
 
 # Função para carregar o schema a partir de um arquivo JSON e converter para StructType
 def load_schema(schema_path: str):
@@ -45,3 +45,6 @@ def json_to_struct_type(schema_json: dict):
         fields.append(StructField(field["name"], data_type, True))
     
     return StructType(fields)
+
+
+    

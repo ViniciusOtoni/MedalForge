@@ -1,9 +1,11 @@
 {
   "columns": [
       {"name": "id"},
-      {"name": "name"},
-      {"name": "age"},
-      {"name": "address"}
+      {"name": "first_name"},
+      {"name": "last_name"},
+      {"name": "email"},
+      {"name": "gender"},
+      {"name": "ip_address"}
   ]
 }
   

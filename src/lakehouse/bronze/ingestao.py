@@ -8,6 +8,7 @@
 
 import sys
 import os
+from datetime import datetime
 
 # -------- # 
 sys.path.insert(0, "../../lib/") # Inserindo o diretório para a primeira posição da lista
@@ -21,6 +22,24 @@ import ingestors
 # MAGIC %md
 # MAGIC
 # MAGIC ### Recebendo parâmetros do Job
+
+# COMMAND ----------
+
+dbutils.widgets.text("catalog", "")
+dbutils.widgets.text("database", "")
+dbutils.widgets.text("table_name", "")
+
+# ----------------------------------------------- #
+
+dbutils.widgets.dropdown("file_format", "csv", ["csv", "json", "text"], "file_format")
+dbutils.widgets.text("delimiter", "")
+dbutils.widgets.dropdown("multiline", "False", ["True", "False"], "multiline")
+dbutils.widgets.dropdown("header", "True", ["True", "False"], "header")
+
+# ----------------------------------------------- #
+
+dbutils.widgets.text("account_name", "adlsprj001")
+dbutils.widgets.text("container_name", "raw")
 
 # COMMAND ----------
 
@@ -48,26 +67,24 @@ BLOB_CONTAINER_NAME = dbutils.widgets.get("container_name")
 # COMMAND ----------
 
 # Recuperando valores do SPN armazenados no Azure Key Vault (AKV)
-CLIENT_ID = dbutils.secrets.get(scope="spn-secret-scope", key="client-id")
-CLIENT_SECRET = dbutils.secrets.get(scope="spn-secret-scope", key="client-secret")
-TENANT_ID = dbutils.secrets.get(scope="spn-secret-scope", key="tenant-id")
+CLIENT_ID = dbutils.secrets.get(scope="akv-scope", key="CLIENT-ID")
+CLIENT_SECRET = dbutils.secrets.get(scope="akv-scope", key="CLIENTSECRET")
+TENANT_ID = dbutils.secrets.get(scope="akv-scope", key="TENANTID")
 
 # COMMAND ----------
 
-# Realizando conexão com o ADLS utilizando as credenciais do SPN
-spark.conf.set(f"spark.hadoop.fs.azure.account.auth.type.{BLOB_ACCOUNT_NAME}.blob.core.windows.net", "OAuth")
-spark.conf.set(f"spark.hadoop.fs.azure.account.oauth.provider.type.{BLOB_ACCOUNT_NAME}.blob.core.windows.net", "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
-spark.conf.set(f"spark.hadoop.fs.azure.account.oauth2.client.id.{BLOB_ACCOUNT_NAME}.blob.core.windows.net", CLIENT_ID)
-spark.conf.set(f"spark.hadoop.fs.azure.account.oauth2.client.secret.{BLOB_ACCOUNT_NAME}.blob.core.windows.net", CLIENT_SECRET)
-spark.conf.set(f"spark.hadoop.fs.azure.account.oauth2.client.endpoint.{BLOB_ACCOUNT_NAME}.blob.core.windows.net", f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/token")
+spark.conf.set(f"fs.azure.account.auth.type.{BLOB_ACCOUNT_NAME}.dfs.core.windows.net", "OAuth")
+spark.conf.set(f"fs.azure.account.oauth.provider.type.{BLOB_ACCOUNT_NAME}.dfs.core.windows.net", "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
+spark.conf.set(f"fs.azure.account.oauth2.client.id.{BLOB_ACCOUNT_NAME}.dfs.core.windows.net", CLIENT_ID)
+spark.conf.set(f"fs.azure.account.oauth2.client.secret.{BLOB_ACCOUNT_NAME}.dfs.core.windows.net", CLIENT_SECRET)
+spark.conf.set(f"fs.azure.account.oauth2.client.endpoint.{BLOB_ACCOUNT_NAME}.dfs.core.windows.net", f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/token")
 
 
 # COMMAND ----------
 
 # Diretório de origem do arquivo & diretório de destino
-ADLS_PATH = f"abfss://{BLOB_CONTAINER_NAME}@{BLOB_ACCOUNT_NAME}.dfs.core.windows.net/{BLOB_CONTAINER_NAME}/"
-EXTERNAL_PATH = f"abfss://{BLOB_CONTAINER_NAME}@{BLOB_ACCOUNT_NAME}.dfs.core.windows.net/bronze/"
-CHECKPOINT_PATH = f"abfss://{BLOB_CONTAINER_NAME}@{BLOB_ACCOUNT_NAME}.dfs.core.windows.net/bronze/checkpoint/"
+ADLS_PATH = f"abfss://{BLOB_CONTAINER_NAME}@{BLOB_ACCOUNT_NAME}.dfs.core.windows.net/{file_format}/"
+EXTERNAL_PATH = f"abfss://bronze@{BLOB_ACCOUNT_NAME}.dfs.core.windows.net/ingestao/"
 
 # COMMAND ----------
 
@@ -83,4 +100,9 @@ schema = utils.load_schema("./schema.json")
 ingestor = ingestors.IngestorFactory.get_ingestor(file_format, spark, catalog, database, table_name, schema, delimiter, multiline, header)
 
 # Invocação do método *ingest* herdado da interface
-ingestor.ingest(ADLS_PATH, EXTERNAL_PATH, CHECKPOINT_PATH)
+ingestor.ingest(ADLS_PATH, EXTERNAL_PATH, partitions=["gender"])
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT count(*) FROM databricks_ws_datamaster.bronze.tb_bronze
