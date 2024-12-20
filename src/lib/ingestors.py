@@ -67,6 +67,10 @@ class UnstructuredDataIngestor(DataIngestor, ABC):
 # ------------------------------------------------------------------------------------------------------------- #
 
 class CSVIngestor(StructuredDataIngestor):
+    """
+        Classe concreta para ingestão de arquivos CSV. Herda de StructuredDataIngestor.
+    """
+
     def ingest(self, source_directory: str, base_bronze_path: str, partitions: list):
         """
         Ingestão de dados de arquivo CSV para o formato Delta em modo batch.
