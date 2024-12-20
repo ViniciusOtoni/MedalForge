@@ -101,8 +101,3 @@ ingestor = ingestors.IngestorFactory.get_ingestor(file_format, spark, catalog, d
 
 # Invocação do método *ingest* herdado da interface
 ingestor.ingest(ADLS_PATH, EXTERNAL_PATH, partitions=["gender"])
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC SELECT count(*) FROM databricks_ws_datamaster.bronze.tb_bronze

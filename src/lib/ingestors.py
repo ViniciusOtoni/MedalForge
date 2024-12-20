@@ -19,13 +19,12 @@ class DataIngestor(ABC):
         self.table_name = table_name
 
     @abstractmethod
-    def ingest(self, source_directory: str, external_location: str, checkpoint_path: str, partitions: list):
+    def ingest(self, source_directory: str, external_location: str, partitions: list):
         """
             Método responsável por ingerir os dados.
             
             :param source_directory: Diretório que será monitorado pelo AutoLoader.
             :param external_location: Caminho onde os dados serão armazenados no formato Delta.
-            :param checkpoint_path: Caminho do checkpoint para AutoLoader.
             :param partitions: Lista de colunas para particionamento.
         """
         pass
@@ -84,18 +83,22 @@ class CSVIngestor(StructuredDataIngestor):
             bronze_path = f"{base_bronze_path}/{self.table_name}/{current_date}/"
 
             # Leitura dos arquivos CSV e gravação direta no formato Delta
-            (self.spark.read
-                .format("csv")
+            (self.spark.readStream
+                .format("cloudFiles") # Monitoramento do AutoLoader
+                .option("cloudFiles.format", "csv")
                 .option("header", str(self.header))  # Define que o arquivo tem cabeçalho
                 .option("delimiter", self.delimiter)  # Define o delimitador
                 .option("nullValue", "")  
                 .schema(self.schema)
-                .load(source_directory)  # Faz a leitura diretamente
-                .write
+                .load(source_directory)  # Leitura
+                .writeStream
                 .format("delta")  # Salva diretamente em Delta
                 .partitionBy(*partitions)
-                .mode("append")
-                .save(bronze_path))
+                .outputMode("append")
+                .option("checkpointLocation", f"{base_bronze_path}/{self.table_name}/_checkpoint") # checkpoint path
+                .trigger(once=True) 
+                .start(bronze_path)
+                .awaitTermination()) # Espera o termino da ingestão para "desligar"
 
             # Criação da tabela externa no Unity Catalog
             utils.create_external_table(self.spark, self.catalog, self.database, self.table_name, bronze_path)
@@ -128,16 +131,20 @@ class JSONIngestor(SemiStructuredDataIngestor):
             bronze_path = f"{base_bronze_path}/{self.table_name}/{current_date}/"
 
             # Leitura dos arquivos JSON e gravação direta no formato Delta
-            (self.spark.read
-                .format("json")
-                .option("multiline", str(self.multiline))
-                .schema(self.schema)
-                .load(source_directory)
-                .write
-                .format("delta")
+            (self.spark.readStream
+                .format("cloudFiles") # Monitoramento do AutoLoader
+                .option("cloudFiles.format", "json")
+                .option("multiline", str(self.multiline)) # Opção de dado multilinha (True | False)
+                .schema(self.schema) # Define schema
+                .load(source_directory) # Leitura
+                .writeStream
+                .format("delta") # Salva diretamente em Delta 
+                .option("checkpointLocation", f"{base_bronze_path}/{self.table_name}/_checkpoint") # checkpoint path
                 .partitionBy(*partitions)
-                .mode("append")
-                .save(bronze_path))
+                .outputMode("append")
+                .trigger(once=True) 
+                .start(bronze_path)
+                .awaitTermination()) # Espera o termino da ingestão para "desligar"
 
             # Criação da tabela externa no Unity Catalog
             utils.create_external_table(self.spark, self.catalog, self.database, self.table_name, bronze_path)
@@ -169,18 +176,22 @@ class TextIngestor(UnstructuredDataIngestor):
             bronze_path = f"{base_bronze_path}/{self.table_name}/{current_date}/"
 
             # Leitura dos arquivos TXT e gravação direta no formato Delta
-            (self.spark.read
-                .format("text")  # Lê os arquivos de texto diretamente
-                .load(source_directory)  # Lê diretamente os dados
+            (self.spark.readStream
+                .format("cloudFiles")  
+                .option("cloudFiles.format", "text")
+                .load(source_directory)  # Leitura
                 .withColumn("splitted_values", F.split(F.col("value"), self.delimiter))  # Divide a coluna "value"
                 # Aplica o esquema carregado dinamicamente
                 .select(*[F.col("splitted_values")[i].alias(self.schema.fields[i].name)
                           for i in range(len(self.schema.fields))])  # Aplica o esquema a cada coluna
-                .write
-                .format("delta")
+                .writeStream
+                .format("delta") # Salva diretamente em Delta
+                .option("checkpointLocation", f"{base_bronze_path}/{self.table_name}/_checkpoint") # checkpoint path
                 .partitionBy(*partitions)
-                .mode("append")
-                .save(bronze_path))  
+                .outputMode("append")
+                .trigger(once=True) 
+                .start(bronze_path)
+                .awaitTermination())  # Espera o termino da ingestão para "desligar"
 
             # Criação da tabela externa no Unity Catalog
             utils.create_external_table(self.spark, self.catalog, self.database, self.table_name, bronze_path)
