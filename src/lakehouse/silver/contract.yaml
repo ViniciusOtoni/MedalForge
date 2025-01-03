@@ -1,0 +1,34 @@
+# Configuração de limpeza de dados
+
+# Configuração para a classe RemoveDuplicates
+remove_duplicates:
+  subset_cols:  
+  
+
+# Configuração para a classe RemoveNulls
+remove_nulls:
+  subset_cols: 
+    - last_name
+    - email
+  how: "any"  # Pode ser "any" (remove linha se qualquer valor for nulo) ou "all" (remove linha se todas as colunas forem nulas)
+
+# Configuração para a classe ConvertDataType
+convert_types:
+  id: "integer"
+  first_name: "string"
+
+# Configuração para a classe HandleNullValues
+null_handling:
+  first_name: "teste"
+
+# Configuração para a classe NormalizeText
+normalize_text:
+  - first_name
+  - last_name
+
+# Configuração para a classe NormalizeTimestamp
+normalize_timestamp:
+  input_col: "timestamp_col"
+  format: "yyyy-MM-dd HH:mm:ss"
+
+

@@ -1,6 +1,6 @@
 import json
 from pyspark.sql.types import StructType, StructField, StringType
-
+import yaml
 
 def create_external_table(spark, catalog, database, table_name, external_location: str):
     
@@ -47,4 +47,15 @@ def json_to_struct_type(schema_json: dict):
     return StructType(fields)
 
 
-    
+# Função para carregar arquivo YAML e converter para um dicionário
+def load_config(config_path: str) -> dict:
+        """
+        Carrega a configuração de um arquivo YAML.
+        :param config_path: Caminho para o arquivo YAML.
+        :return: Dicionário com a configuração.
+        """
+        with open(config_path, 'r') as file:
+            return yaml.safe_load(file)
+
+
+

@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Processo de tratamento de dados (Limpeza, Lematização etc...) para camada Silver
+# MAGIC # Processo de tratamento de dados para camada Silver
 # MAGIC ### Nesse processo é realizado o tratamento dos dados *Bronze* passando por um Pipeline criando uma External Table no formato Delta
 
 # COMMAND ----------
@@ -26,7 +26,7 @@ import pipeline
 dbutils.widgets.text("catalog", "databricks_ws_datamaster")
 
 dbutils.widgets.text("database", "bronze")
-dbutils.widgets.text("current_database", "bronze")
+dbutils.widgets.text("current_database", "silver")
 
 dbutils.widgets.text("table_name", "tb_bronze_autoloader")
 dbutils.widgets.text("current_table_name", "tb_silver")
@@ -87,25 +87,14 @@ df_bronze = spark.sql("SELECT * FROM {}.{}.{}".format(catalog, database, table_n
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ### Etapa dinâmica para classes de Tratamento
-
-# COMMAND ----------
-
-# COMO VOU FAZER??????
-steps = ["FillNulls"]
-parms = {
-    #"RemoveNullsAndDuplicates": {"subset_cols": ["gender", "email"]},
-    "FillNulls": {"subset_cols": ["first_name"], "value_fill": "teste"},
-}
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC ### Etapa de instância do Pipeline de ETL e criação da tabela Silver
 
 # COMMAND ----------
 
-pipe = pipeline.DynamicPipe(df_bronze, steps, parms) # Instância do Pipeline.
+config = utils.load_config("./contract.yaml")
+steps = ["remove_duplicates", "convert_types", "null_handling"]
+
+pipe = pipeline.DynamicPipe(df_bronze, steps, config) # Instância do Pipeline.
 df_silver = pipe.execute() # Executando o Pipeline (steps -> Transformação dos dados).
 
 # COMMAND ----------
@@ -120,3 +109,8 @@ df_silver.write.format("delta").mode("overwrite").option("overwriteSchema", "tru
 # COMMAND ----------
 
 utils.create_external_table(spark, catalog, current_database, current_table_name, f"{EXTERNAL_PATH}/{current_table_name}")
+
+# COMMAND ----------
+
+# %sql
+# DROP TABLE databricks_ws_datamaster.silver.tb_silver
