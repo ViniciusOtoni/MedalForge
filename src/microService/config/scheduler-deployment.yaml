@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-scheduler
+  namespace: airflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: airflow-scheduler
+  template:
+    metadata:
+      labels:
+        app: airflow-scheduler
+    spec:
+      initContainers:
+        - name: fix-permissions
+          image: alpine
+          command:
+            - sh
+            - -c
+            - |
+              echo "Configurando SSH..."
+              mkdir -p /tmp/home/.ssh
+              cp /etc/git-secret/gitSshKey /tmp/home/.ssh/id_rsa
+              cp /etc/git-secret/known_hosts /tmp/home/.ssh/known_hosts
+              chmod 600 /tmp/home/.ssh/id_rsa
+              chmod 644 /tmp/home/.ssh/known_hosts
+              chown -R 65533:65533 /tmp/home/.ssh  # Corrige permissões para o usuário do git-sync
+          volumeMounts:
+            - name: git-secret-volume
+              mountPath: /etc/git-secret
+              readOnly: true
+            - name: tmp-home
+              mountPath: /tmp/home
+
+        - name: init-airflow-db
+          image: viniciusotoni/custom-airflow-image
+          command: ["airflow", "db", "init"]
+          env:
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: KubernetesExecutor
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: POSTGRES_URL
+
+      containers:
+        - name: scheduler
+          image: viniciusotoni/custom-airflow-image
+          command: ["airflow", "scheduler"]
+          env:
+            - name: AIRFLOW__CORE__EXECUTOR
+              value: KubernetesExecutor
+            - name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: POSTGRES_URL
+            - name: AIRFLOW__KUBERNETES__NAMESPACE
+              value: airflow
+            - name: AIRFLOW__CORE__DAGS_FOLDER
+              value: /opt/airflow/dags
+          volumeMounts:
+            - mountPath: /opt/airflow/dags
+              name: airflow-dags
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+
+        - name: git-sync
+          image: k8s.gcr.io/git-sync:v3.1.2
+          env:
+            - name: HOME
+              value: /tmp/home
+          args:
+            - "--repo=git@github.com:ViniciusOtoni/Dags-Datamaster.git"
+            - "--branch=main"
+            - "--root=/git"
+            - "--dest=dags"
+            - "--ssh"
+            - "--ssh-key-file=/tmp/home/.ssh/id_rsa"
+            - "--ssh-known-hosts-file=/tmp/home/.ssh/known_hosts"
+            - "--wait=3600"
+          volumeMounts:
+            - name: airflow-dags
+              mountPath: /git
+            - name: tmp-home
+              mountPath: /tmp/home
+            - name: git-secret-volume
+              mountPath: /etc/git-secret
+              readOnly: true
+
+      volumes:
+        - name: airflow-dags
+          emptyDir: {}
+        
+        - name: git-secret-volume
+          secret:
+             secretName: airflow-git-ssh-secret
+        - name: tmp-home
+          emptyDir: {}
